@@ -52,4 +52,12 @@ object Prefs {
     /** Stop everything after this many minutes; 0 = no timer. */
     fun timerMinutes(ctx: Context) = p(ctx).getInt("timerMinutes", 0)
     fun setTimerMinutes(ctx: Context, v: Int) = p(ctx).edit().putInt("timerMinutes", v).apply()
+
+    /** Sequence mode: buttons fire one after another instead of each on its own timer. */
+    fun sequence(ctx: Context) = p(ctx).getBoolean("sequence", false)
+    fun setSequence(ctx: Context, v: Boolean) = p(ctx).edit().putBoolean("sequence", v).apply()
+
+    /** Sequence mode: how many times to run through the whole list; 0 = forever. */
+    fun cycles(ctx: Context) = p(ctx).getInt("cycles", 0)
+    fun setCycles(ctx: Context, v: Int) = p(ctx).edit().putInt("cycles", v).apply()
 }

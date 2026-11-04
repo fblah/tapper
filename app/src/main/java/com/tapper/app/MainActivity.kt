@@ -9,6 +9,7 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -32,21 +33,17 @@ class MainActivity : Activity() {
             text = "Show floating controls"
             setOnClickListener { TapService.instance?.showOverlay() }
         }
-        val timerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        timerRow.addView(TextView(this).apply { text = "Stop after (minutes, 0 = never): " })
-        val timer = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            setText(Prefs.timerMinutes(this@MainActivity).toString())
-            minEms = 4
-            addTextChangedListener(object : TextWatcher {
-                override fun afterTextChanged(e: Editable?) {
-                    Prefs.setTimerMinutes(this@MainActivity, e.toString().toIntOrNull() ?: 0)
-                }
-                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            })
+        val timerRow = numberRow("Stop after (minutes, 0 = never): ", Prefs.timerMinutes(this)) {
+            Prefs.setTimerMinutes(this, it)
         }
-        timerRow.addView(timer)
+        val sequence = CheckBox(this).apply {
+            text = "Sequence mode (buttons tap one after another, in number order)"
+            isChecked = Prefs.sequence(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setSequence(this@MainActivity, on) }
+        }
+        val cyclesRow = numberRow("Sequence cycles (0 = forever): ", Prefs.cycles(this)) {
+            Prefs.setCycles(this, it)
+        }
         val help = TextView(this).apply {
             textSize = 14f
             setPadding(0, pad, 0, 0)
@@ -59,9 +56,26 @@ class MainActivity : Activity() {
                 5. ✕ hides the controls; use "Show floating controls" here to bring them back.
             """.trimIndent()
         }
-        root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(help)
+        root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(sequence); root.addView(cyclesRow)
+        root.addView(help)
         setContentView(root)
     }
+
+    private fun numberRow(label: String, initial: Int, onChange: (Int) -> Unit) =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(TextView(context).apply { text = label })
+            addView(EditText(context).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                setText(initial.toString())
+                minEms = 4
+                addTextChangedListener(object : TextWatcher {
+                    override fun afterTextChanged(e: Editable?) { onChange(e.toString().toIntOrNull() ?: 0) }
+                    override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                })
+            })
+        }
 
     override fun onResume() {
         super.onResume()

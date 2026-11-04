@@ -69,6 +69,30 @@ class TapService : AccessibilityService() {
     private var editor: View? = null
     private var running = false
     private val timerStop = Runnable { stopRunning() }
+    private var sequenceMode = false
+    private var maxCycles = 0
+    private var seqIndex = 0
+    private var seqRep = 0
+    private var seqCycle = 0
+    /** Sequence mode: tap button [seqIndex] (its repeat count in a row), wait its interval, move on. */
+    private val seqTick = object : Runnable {
+        override fun run() {
+            if (!running || bubbles.isEmpty()) return
+            val b = bubbles[seqIndex]
+            tap(b)
+            seqRep++
+            if (seqRep >= maxOf(1, b.target.repeat)) {
+                seqRep = 0
+                seqIndex++
+                if (seqIndex >= bubbles.size) {
+                    seqIndex = 0
+                    seqCycle++
+                    if (maxCycles > 0 && seqCycle >= maxCycles) { stopRunning(); return }
+                }
+            }
+            handler.postDelayed(this, b.target.intervalMs)
+        }
+    }
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
 
@@ -248,7 +272,7 @@ class TapService : AccessibilityService() {
             background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(12).toFloat() }
         }
         box.addView(TextView(this).apply {
-            text = "Button ${bubbles.indexOf(b) + 1}: tap every (ms)"
+            text = "Button ${bubbles.indexOf(b) + 1}: tap every (ms; in sequence mode: wait after)"
             setTextColor(Color.BLACK); textSize = 16f
         })
         val input = EditText(this).apply {
@@ -258,7 +282,7 @@ class TapService : AccessibilityService() {
         }
         box.addView(input)
         box.addView(TextView(this).apply {
-            text = "Number of taps (0 = unlimited)"; setTextColor(Color.BLACK); textSize = 16f
+            text = "Number of taps (0 = unlimited; in sequence mode: taps in a row)"; setTextColor(Color.BLACK); textSize = 16f
         })
         val repeatInput = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
@@ -325,14 +349,20 @@ class TapService : AccessibilityService() {
         playBtn?.text = "■"
         val now = SystemClock.uptimeMillis()
         val minutes = Prefs.timerMinutes(this)
+        sequenceMode = Prefs.sequence(this)
+        maxCycles = Prefs.cycles(this)
+        seqIndex = 0; seqRep = 0; seqCycle = 0
         if (minutes > 0) handler.postDelayed(timerStop, minutes * 60_000L)
         bubbles.forEach { b ->
             b.count = 0
             b.views().forEach { it.alpha = 1f }
             setTouchable(b, false)
-            b.nextAt = now + b.target.intervalMs
-            handler.postAtTime(b.tick, b.nextAt)
+            if (!sequenceMode) {
+                b.nextAt = now + b.target.intervalMs
+                handler.postAtTime(b.tick, b.nextAt)
+            }
         }
+        if (sequenceMode) handler.postDelayed(seqTick, 500)
     }
 
     private fun stopRunning() {
@@ -342,6 +372,7 @@ class TapService : AccessibilityService() {
         bubbles.forEach { b ->
             b.views().forEach { it.alpha = 1f }
             handler.removeCallbacks(b.tick)
+            handler.removeCallbacks(seqTick)
             setTouchable(b, true)
         }
     }
