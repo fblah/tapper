@@ -5,7 +5,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -28,6 +32,21 @@ class MainActivity : Activity() {
             text = "Show floating controls"
             setOnClickListener { TapService.instance?.showOverlay() }
         }
+        val timerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        timerRow.addView(TextView(this).apply { text = "Stop after (minutes, 0 = never): " })
+        val timer = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(Prefs.timerMinutes(this@MainActivity).toString())
+            minEms = 4
+            addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(e: Editable?) {
+                    Prefs.setTimerMinutes(this@MainActivity, e.toString().toIntOrNull() ?: 0)
+                }
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            })
+        }
+        timerRow.addView(timer)
         val help = TextView(this).apply {
             textSize = 14f
             setPadding(0, pad, 0, 0)
@@ -40,7 +59,7 @@ class MainActivity : Activity() {
                 5. ✕ hides the controls; use "Show floating controls" here to bring them back.
             """.trimIndent()
         }
-        root.addView(status); root.addView(enable); root.addView(show); root.addView(help)
+        root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(help)
         setContentView(root)
     }
 

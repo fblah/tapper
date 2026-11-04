@@ -35,13 +35,21 @@ class TapService : AccessibilityService() {
     }
 
     private inner class Bubble(val target: Target) {
+        fun finished() = target.repeat > 0 && count >= target.repeat
         lateinit var view: TextView
         lateinit var params: WindowManager.LayoutParams
         var nextAt = 0L
+        var count = 0
         val tick = object : Runnable {
             override fun run() {
                 if (!running) return
                 tap(this@Bubble)
+                count++
+                if (target.repeat > 0 && count >= target.repeat) {
+                    bubbles.forEach { it.view.alpha = if (it.finished()) 0.3f else 1f }
+                    if (bubbles.all { it.finished() }) stopRunning()
+                    return
+                }
                 nextAt += target.intervalMs
                 val now = SystemClock.uptimeMillis()
                 if (nextAt < now) nextAt = now // fell behind; don't burst
@@ -57,6 +65,7 @@ class TapService : AccessibilityService() {
     private var playBtn: Button? = null
     private var editor: View? = null
     private var running = false
+    private val timerStop = Runnable { stopRunning() }
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
 
@@ -220,6 +229,14 @@ class TapService : AccessibilityService() {
             setTextColor(Color.BLACK)
         }
         box.addView(input)
+        box.addView(TextView(this).apply {
+            text = "Number of taps (0 = unlimited)"; setTextColor(Color.BLACK); textSize = 16f
+        })
+        val repeatInput = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(b.target.repeat.toString()); setTextColor(Color.BLACK)
+        }
+        box.addView(repeatInput)
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(Button(this).apply {
             text = "Save"
@@ -227,8 +244,9 @@ class TapService : AccessibilityService() {
                 val v = input.text.toString().toLongOrNull()
                 if (v != null) {
                     b.target.intervalMs = v.coerceAtLeast(MIN_INTERVAL_MS)
-                    persist()
                 }
+                b.target.repeat = repeatInput.text.toString().toIntOrNull()?.coerceAtLeast(0) ?: 0
+                persist()
                 closeEditor()
             }
         })
@@ -266,7 +284,11 @@ class TapService : AccessibilityService() {
         running = true
         playBtn?.text = "■"
         val now = SystemClock.uptimeMillis()
+        val minutes = Prefs.timerMinutes(this)
+        if (minutes > 0) handler.postDelayed(timerStop, minutes * 60_000L)
         bubbles.forEach { b ->
+            b.count = 0
+            b.view.alpha = 1f
             b.params.flags = b.params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             wm.updateViewLayout(b.view, b.params)
             b.nextAt = now + b.target.intervalMs
@@ -276,8 +298,10 @@ class TapService : AccessibilityService() {
 
     private fun stopRunning() {
         running = false
+        handler.removeCallbacks(timerStop)
         playBtn?.text = "▶"
         bubbles.forEach { b ->
+            b.view.alpha = 1f
             handler.removeCallbacks(b.tick)
             b.params.flags = b.params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
             runCatching { wm.updateViewLayout(b.view, b.params) }
