@@ -7,6 +7,8 @@ Built on an `AccessibilityService`: overlays use `TYPE_ACCESSIBILITY_OVERLAY` an
 ## Download
 Every push builds the app and updates the **latest** release: `https://github.com/fblah/tapper/releases/tag/latest` (`tapper-debug.apk`).
 
+Tagged versions get their own permanent release: `git tag v1.0.0 && git push origin v1.0.0`.
+
 ## Build
 Locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
 

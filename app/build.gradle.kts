@@ -11,8 +11,8 @@ android {
         applicationId = "com.tapper.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("appVersion") as String?) ?: "1.0"
     }
     buildTypes {
         release { isMinifyEnabled = false }
