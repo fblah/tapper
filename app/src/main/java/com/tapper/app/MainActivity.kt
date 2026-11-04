@@ -10,7 +10,12 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
+import android.os.Handler
+import android.os.Looper
+import java.io.File
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
@@ -22,6 +27,13 @@ class MainActivity : Activity() {
     private companion object { const val REQ_EXPORT = 1; const val REQ_IMPORT = 2 }
 
     private lateinit var status: TextView
+    private lateinit var updStatus: TextView
+    private lateinit var updButton: Button
+    private val ui = Handler(Looper.getMainLooper())
+    private var available: Updater.Release? = null
+    private var pendingApk: File? = null
+    private var busy = false
+    private var checkedOnLaunch = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,8 +43,18 @@ class MainActivity : Activity() {
         }
 
         // Header
-        root.addView(label("Tapper", 32f, Ui.TEXT, bold = true))
-        root.addView(label("Floating tap & swipe buttons on a timer", 14f, Ui.MUTED))
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.app_hero)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = shape(Ui.SURFACE, 16)
+            clipToOutline = true
+        }, lp(px(68), px(68), end = 16))
+        val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        titles.addView(label("Tapper", 32f, Ui.TEXT, bold = true))
+        titles.addView(label("Floating tap & swipe buttons on a timer", 14f, Ui.MUTED))
+        header.addView(titles)
+        root.addView(header)
 
         status = label("", 13f, Ui.TEXT, bold = true).apply {
             setPadding(px(14), px(8), px(14), px(8))
@@ -91,6 +113,16 @@ class MainActivity : Activity() {
         prof.addView(row2, lp(top = 8))
         root.addView(prof, lp(top = 16))
 
+        // Updates
+        val upd = uiCard()
+        upd.addView(label("Updates", 18f, Ui.TEXT, bold = true))
+        updStatus = label("", 13f, Ui.MUTED)
+        upd.addView(updStatus, lp(top = 4))
+        updButton = uiButton("Check for updates", Ui.Kind.SECONDARY) { onUpdateButton() }
+        upd.addView(updButton, lp(top = 12))
+        updStatus.text = "Installed: ${Updater.installedName(this)} (build ${Updater.installedBuild(this)})"
+        root.addView(upd, lp(top = 16))
+
         // Help
         val help = uiCard()
         help.addView(label("How it works", 18f, Ui.TEXT, bold = true))
@@ -119,6 +151,71 @@ class MainActivity : Activity() {
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             })
         }
+
+    private fun setUpdate(text: String, buttonText: String, enabled: Boolean = true) {
+        updStatus.text = text
+        updButton.text = buttonText
+        updButton.isEnabled = enabled
+    }
+
+    private fun onUpdateButton() {
+        val rel = available
+        if (rel == null) checkForUpdates() else downloadAndInstall(rel)
+    }
+
+    private fun checkForUpdates() {
+        if (busy) return
+        busy = true
+        setUpdate("Checking…", "Checking…", false)
+        Thread {
+            val result = runCatching { Updater.fetchLatest() }
+            ui.post {
+                busy = false
+                val installed = Updater.installedBuild(this)
+                result.onSuccess { rel ->
+                    if (rel != null && rel.build > installed) {
+                        available = rel
+                        val mb = if (rel.size > 0) " (%.1f MB)".format(rel.size / 1048576.0) else ""
+                        setUpdate("Update available: ${rel.name}, build ${rel.build}$mb. You have build $installed.",
+                            "Download & install")
+                    } else {
+                        available = null
+                        setUpdate("You're up to date (${Updater.installedName(this)}, build $installed).", "Check for updates")
+                    }
+                }.onFailure {
+                    available = null
+                    setUpdate("Couldn't check for updates: ${it.message ?: it.javaClass.simpleName}", "Try again")
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadAndInstall(rel: Updater.Release) {
+        if (busy) return
+        busy = true
+        setUpdate("Downloading build ${rel.build}…", "Downloading…", false)
+        Thread {
+            val result = runCatching {
+                Updater.download(this, rel) { pct ->
+                    ui.post { updButton.text = if (pct >= 0) "Downloading… $pct%" else "Downloading…" }
+                }
+            }
+            ui.post {
+                busy = false
+                result.onSuccess { apk ->
+                    setUpdate("Downloaded build ${rel.build}.", "Install update")
+                    if (Updater.canInstall(this)) Updater.install(this, apk)
+                    else {
+                        pendingApk = apk
+                        toast("Allow Tapper to install apps, then come back")
+                        Updater.requestInstallPermission(this)
+                    }
+                }.onFailure {
+                    setUpdate("Download failed: ${it.message ?: it.javaClass.simpleName}", "Try again")
+                }
+            }
+        }.start()
+    }
 
     private fun showControls() {
         val svc = TapService.instance
@@ -162,6 +259,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        pendingApk?.let { apk ->
+            if (Updater.canInstall(this)) { pendingApk = null; Updater.install(this, apk) }
+        }
+        if (!checkedOnLaunch) { checkedOnLaunch = true; checkForUpdates() }
         val on = TapService.instance != null
         status.text = if (on) "●  Service active" else "●  Service off — tap to enable"
         status.setTextColor(if (on) Ui.OK else Ui.WARN)

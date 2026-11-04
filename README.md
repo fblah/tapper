@@ -9,6 +9,9 @@ Every push builds the app and updates the **latest** release: `https://github.co
 
 Tagged versions get their own permanent release: `git tag v1.0.0 && git push origin v1.0.0`.
 
+## Updates
+The app checks this repo's releases on launch (and via the *Updates* card) and can download and install a newer build. Android asks you to allow Tapper to install apps the first time. Builds are all signed with the committed `app/debug.keystore` so they install over each other.
+
 ## Build
 Locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
 

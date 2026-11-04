@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -33,18 +33,20 @@ jobs:
           path: tapper-debug.apk
 
       # Rolling "latest" release: always points at the newest build, downloadable without login
-      # (as long as the repository is public).
+      # (the repository is public). The "build=N" line is read by the in-app updater.
       - name: Publish latest release
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --cleanup-tag --yes || true
-          gh release create latest tapper-debug.apk \
-            --title "Tapper (latest build)" \
-            --notes "Debug APK built from ${{ github.sha }} on branch ${{ github.ref_name }}." \
-            --target "${{ github.sha }}" \
-            --prerelease
+          NOTES="$(printf 'Debug APK built from %s on branch %s.\n\nbuild=%s' "${{ github.sha }}" "${{ github.ref_name }}" "${{ github.run_number }}")"
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --notes "$NOTES" --title "Tapper (latest build)" --prerelease
+            gh release upload latest tapper-debug.apk --clobber
+          else
+            gh release create latest tapper-debug.apk --title "Tapper (latest build)" \
+              --notes "$NOTES" --target "${{ github.sha }}" --prerelease
+          fi
 
       # Tagged release (git tag v1.2.3 && git push origin v1.2.3): permanent, versioned download.
       - name: Publish versioned release
@@ -55,4 +57,4 @@ jobs:
           cp tapper-debug.apk "tapper-${GITHUB_REF_NAME}.apk"
           gh release create "$GITHUB_REF_NAME" "tapper-${GITHUB_REF_NAME}.apk" \
             --title "Tapper ${GITHUB_REF_NAME}" \
-            --generate-notes
+            --notes "build=${{ github.run_number }}" --generate-notes
