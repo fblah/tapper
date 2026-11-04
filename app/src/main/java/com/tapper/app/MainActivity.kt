@@ -8,6 +8,9 @@ import android.view.Gravity
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.app.AlertDialog
+import android.widget.Toast
+import org.json.JSONObject
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -15,6 +18,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 class MainActivity : Activity() {
+    private companion object { const val REQ_EXPORT = 1; const val REQ_IMPORT = 2 }
+
     private lateinit var status: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,6 +49,39 @@ class MainActivity : Activity() {
         val cyclesRow = numberRow("Sequence cycles (0 = forever): ", Prefs.cycles(this)) {
             Prefs.setCycles(this, it)
         }
+        val profileName = EditText(this).apply { hint = "Profile name (e.g. game name)" }
+        val profileRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(context).apply {
+                text = "Save"
+                setOnClickListener {
+                    val n = profileName.text.toString().trim()
+                    if (n.isEmpty()) toast("Enter a profile name") else { Profiles.save(this@MainActivity, n); toast("Saved \"$n\"") }
+                }
+            })
+            addView(Button(context).apply { text = "Load"; setOnClickListener { pickProfile(delete = false) } })
+            addView(Button(context).apply { text = "Delete"; setOnClickListener { pickProfile(delete = true) } })
+        }
+        val fileRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(Button(context).apply {
+                text = "Export file"
+                setOnClickListener {
+                    startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE); type = "application/json"
+                        putExtra(Intent.EXTRA_TITLE, "tapper-profile.json")
+                    }, REQ_EXPORT)
+                }
+            })
+            addView(Button(context).apply {
+                text = "Import file"
+                setOnClickListener {
+                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                    }, REQ_IMPORT)
+                }
+            })
+        }
         val help = TextView(this).apply {
             textSize = 14f
             setPadding(0, pad, 0, 0)
@@ -57,6 +95,7 @@ class MainActivity : Activity() {
             """.trimIndent()
         }
         root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(sequence); root.addView(cyclesRow)
+        root.addView(profileName); root.addView(profileRow); root.addView(fileRow)
         root.addView(help)
         setContentView(root)
     }
@@ -76,6 +115,38 @@ class MainActivity : Activity() {
                 })
             })
         }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    private fun pickProfile(delete: Boolean) {
+        val names = Profiles.names(this)
+        if (names.isEmpty()) { toast("No saved profiles"); return }
+        AlertDialog.Builder(this)
+            .setTitle(if (delete) "Delete profile" else "Load profile")
+            .setItems(names.toTypedArray()) { _, i ->
+                if (delete) Profiles.delete(this, names[i])
+                else { Profiles.load(this, names[i]); toast("Loaded \"${names[i]}\"") }
+            }.show()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) return
+        try {
+            if (requestCode == REQ_EXPORT) {
+                contentResolver.openOutputStream(uri)!!.use { it.write(Profiles.snapshot(this).toString(2).toByteArray()) }
+                toast("Exported")
+            } else if (requestCode == REQ_IMPORT) {
+                val text = contentResolver.openInputStream(uri)!!.use { String(it.readBytes()) }
+                Profiles.apply(this, JSONObject(text))
+                toast("Imported")
+            }
+        } catch (e: Exception) {
+            toast("Failed: ${e.message}")
+        }
+    }
 
     override fun onResume() {
         super.onResume()

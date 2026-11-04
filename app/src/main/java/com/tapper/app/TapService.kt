@@ -119,6 +119,13 @@ class TapService : AccessibilityService() {
         addPanel()
     }
 
+    /** Re-read the saved layout (after a profile is loaded or imported). */
+    fun reload() {
+        if (panel == null) return
+        hideOverlay()
+        showOverlay()
+    }
+
     private fun hideOverlay() {
         stopRunning()
         closeEditor()
