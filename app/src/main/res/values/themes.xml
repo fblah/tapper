@@ -8,5 +8,5 @@
         <item name="android:colorControlActivated">#8B7CFF</item>
         <item name="android:textColorPrimary">#F2F4F8</item>
     </style>
-    <color name="ic_bg">#171A22</color>
+    <color name="ic_bg">#051A40</color>
 </resources>
