@@ -14,14 +14,18 @@ android {
         versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("appVersion") as String?) ?: "1.0"
     }
-    // A fixed signing key, so every CI build is signed identically and installs over the previous
-    // one. (Without it each CI runner generates a new random debug key and updates would fail.)
+    // CI signs every build with the private key held in GitHub secrets (see .github/workflows),
+    // so each build installs over the previous one and the in-app updater works. Without those
+    // environment variables (local builds) Android's default debug key is used.
     signingConfigs {
-        getByName("debug") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        val keystorePath = System.getenv("KEYSTORE_FILE")
+        if (keystorePath != null) {
+            getByName("debug") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
         }
     }
     buildTypes {

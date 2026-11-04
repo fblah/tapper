@@ -10,7 +10,24 @@ Every push builds the app and updates the **latest** release: `https://github.co
 Tagged versions get their own permanent release: `git tag v1.0.0 && git push origin v1.0.0`.
 
 ## Updates
-The app checks this repo's releases on launch (and via the *Updates* card) and can download and install a newer build. Android asks you to allow Tapper to install apps the first time. Builds are all signed with the committed `app/debug.keystore` so they install over each other.
+The app checks this repo's releases on launch (and via the *Updates* card) and can download and install a newer build. Android asks you to allow Tapper to install apps the first time. Builds are signed in CI with a private key kept in GitHub secrets, so they install over each other.
+
+## Signing setup (one time)
+Create a key and store it as repository secrets (Settings > Secrets and variables > Actions):
+
+```bash
+keytool -genkeypair -v -keystore tapper-release.jks -alias tapper -keyalg RSA -keysize 2048 -validity 36500
+base64 -w0 tapper-release.jks   # macOS: base64 -i tapper-release.jks
+```
+
+| Secret | Value |
+| --- | --- |
+| `KEYSTORE_BASE64` | the base64 output above |
+| `KEYSTORE_PASSWORD` | the keystore password you chose |
+| `KEY_ALIAS` | `tapper` |
+| `KEY_PASSWORD` | the key password you chose |
+
+Keep a backup of `tapper-release.jks`: if it is lost, installed copies can't be updated (uninstall and reinstall). Without the secrets, CI still builds an artifact but does not publish a release.
 
 ## Build
 Locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
