@@ -4,8 +4,11 @@ Android app that places draggable virtual buttons on screen and taps them at fix
 
 Built on an `AccessibilityService`: overlays use `TYPE_ACCESSIBILITY_OVERLAY` and taps are injected with `dispatchGesture` (API 24+). The service reads no screen content.
 
+## Download
+Every push builds the app and updates the **latest** release: `https://github.com/fblah/tapper/releases/tag/latest` (`tapper-debug.apk`).
+
 ## Build
-Push to GitHub and download the `tapper-debug-apk` artifact from the *Build APK* workflow, or locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
+Locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
 
 ## Use
 1. Install, open Tapper, enable it in Settings > Accessibility.

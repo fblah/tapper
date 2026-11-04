@@ -2,6 +2,14 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish the release
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,7 +20,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: 8.7 }
       - run: gradle :app:assembleDebug
+      - run: cp app/build/outputs/apk/debug/app-debug.apk tapper-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: tapper-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: tapper-debug.apk
+
+      # Rolling "latest" release: always points at the newest build, downloadable without login
+      # (as long as the repository is public).
+      - name: Publish latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest tapper-debug.apk \
+            --title "Tapper (latest build)" \
+            --notes "Debug APK built from ${{ github.sha }} on branch ${{ github.ref_name }}." \
+            --target "${{ github.sha }}" \
+            --prerelease
