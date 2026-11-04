@@ -53,7 +53,7 @@ class TapService : AccessibilityService() {
                     if (bubbles.all { it.finished() }) stopRunning()
                     return
                 }
-                nextAt += target.intervalMs
+                nextAt += jitteredInterval(target.intervalMs)
                 val now = SystemClock.uptimeMillis()
                 if (nextAt < now) nextAt = now // fell behind; don't burst
                 handler.postAtTime(this, nextAt)
@@ -71,6 +71,8 @@ class TapService : AccessibilityService() {
     private val timerStop = Runnable { stopRunning() }
     private var sequenceMode = false
     private var maxCycles = 0
+    private var jitterPct = 0
+    private var jitterPx = 0
     private var seqIndex = 0
     private var seqRep = 0
     private var seqCycle = 0
@@ -90,7 +92,7 @@ class TapService : AccessibilityService() {
                     if (maxCycles > 0 && seqCycle >= maxCycles) { stopRunning(); return }
                 }
             }
-            handler.postDelayed(this, b.target.intervalMs)
+            handler.postDelayed(this, jitteredInterval(b.target.intervalMs))
         }
     }
     private val density get() = resources.displayMetrics.density
@@ -358,6 +360,8 @@ class TapService : AccessibilityService() {
         val minutes = Prefs.timerMinutes(this)
         sequenceMode = Prefs.sequence(this)
         maxCycles = Prefs.cycles(this)
+        jitterPct = Prefs.jitterPct(this)
+        jitterPx = Prefs.jitterPx(this)
         seqIndex = 0; seqRep = 0; seqCycle = 0
         if (minutes > 0) handler.postDelayed(timerStop, minutes * 60_000L)
         bubbles.forEach { b ->
@@ -384,17 +388,25 @@ class TapService : AccessibilityService() {
         }
     }
 
+    private fun jitteredInterval(ms: Long): Long {
+        if (jitterPct == 0) return ms
+        val spread = ms * jitterPct / 100.0
+        return (ms + (Math.random() * 2 - 1) * spread).toLong().coerceAtLeast(MIN_INTERVAL_MS)
+    }
+
+    private fun jitterPos() = if (jitterPx == 0) 0f else ((Math.random() * 2 - 1) * jitterPx).toFloat()
+
     private fun tap(b: Bubble) {
         val loc = IntArray(2)
         b.view.getLocationOnScreen(loc)
         val path = Path().apply {
-            moveTo(loc[0] + b.view.width / 2f, loc[1] + b.view.height / 2f)
+            moveTo(loc[0] + b.view.width / 2f + jitterPos(), loc[1] + b.view.height / 2f + jitterPos())
         }
         var duration = TAP_DURATION_MS
         b.endView?.let { ev ->
             val end = IntArray(2)
             ev.getLocationOnScreen(end)
-            path.lineTo(end[0] + ev.width / 2f, end[1] + ev.height / 2f)
+            path.lineTo(end[0] + ev.width / 2f + jitterPos(), end[1] + ev.height / 2f + jitterPos())
             duration = b.target.swipeMs
         }
         val gesture = GestureDescription.Builder()

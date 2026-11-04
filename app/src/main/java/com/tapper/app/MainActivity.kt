@@ -49,6 +49,12 @@ class MainActivity : Activity() {
         val cyclesRow = numberRow("Sequence cycles (0 = forever): ", Prefs.cycles(this)) {
             Prefs.setCycles(this, it)
         }
+        val jitterPctRow = numberRow("Random interval variation (+/- %): ", Prefs.jitterPct(this)) {
+            Prefs.setJitterPct(this, it)
+        }
+        val jitterPxRow = numberRow("Random tap position offset (+/- px): ", Prefs.jitterPx(this)) {
+            Prefs.setJitterPx(this, it)
+        }
         val profileName = EditText(this).apply { hint = "Profile name (e.g. game name)" }
         val profileRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -95,6 +101,7 @@ class MainActivity : Activity() {
             """.trimIndent()
         }
         root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(sequence); root.addView(cyclesRow)
+        root.addView(jitterPctRow); root.addView(jitterPxRow)
         root.addView(profileName); root.addView(profileRow); root.addView(fileRow)
         root.addView(help)
         setContentView(root)

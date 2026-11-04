@@ -60,4 +60,12 @@ object Prefs {
     /** Sequence mode: how many times to run through the whole list; 0 = forever. */
     fun cycles(ctx: Context) = p(ctx).getInt("cycles", 0)
     fun setCycles(ctx: Context, v: Int) = p(ctx).edit().putInt("cycles", v).apply()
+
+    /** Random variation of each interval, +/- this many percent (0-90). */
+    fun jitterPct(ctx: Context) = p(ctx).getInt("jitterPct", 0)
+    fun setJitterPct(ctx: Context, v: Int) = p(ctx).edit().putInt("jitterPct", v.coerceIn(0, 90)).apply()
+
+    /** Random offset of each tap position, +/- this many pixels. */
+    fun jitterPx(ctx: Context) = p(ctx).getInt("jitterPx", 0)
+    fun setJitterPx(ctx: Context, v: Int) = p(ctx).edit().putInt("jitterPx", v.coerceIn(0, 200)).apply()
 }
