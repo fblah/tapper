@@ -44,6 +44,7 @@ object Profiles {
                 is Boolean -> edit.putBoolean(k, v)
                 is Int -> edit.putInt(k, v)
                 is Long -> edit.putLong(k, v)
+                is String -> edit.putString(k, v)
                 is Number -> edit.putFloat(k, v.toFloat())
             }
         }

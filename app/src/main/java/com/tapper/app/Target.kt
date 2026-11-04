@@ -16,6 +16,39 @@ data class Target(
     var swipeMs: Long = 300L
 )
 
+/** One recorded touch: starts [t] ms after the first one, lasts [d] ms, follows [pts] (x,y pairs). */
+class Stroke(val t: Long, var d: Long, val pts: MutableList<FloatArray>)
+
+object MacroStore {
+    private const val KEY = "macro"
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences("tapper_settings", Context.MODE_PRIVATE)
+
+    fun load(ctx: Context): MutableList<Stroke> {
+        val raw = prefs(ctx).getString(KEY, null) ?: return mutableListOf()
+        return try {
+            val arr = JSONArray(raw)
+            MutableList(arr.length()) { i ->
+                val o = arr.getJSONObject(i)
+                val p = o.getJSONArray("p")
+                Stroke(o.getLong("t"), o.getLong("d"),
+                    MutableList(p.length()) { j -> p.getJSONArray(j).let { floatArrayOf(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } })
+            }
+        } catch (e: Exception) {
+            mutableListOf()
+        }
+    }
+
+    fun save(ctx: Context, strokes: List<Stroke>) {
+        val arr = JSONArray()
+        strokes.forEach { s ->
+            val pts = JSONArray()
+            s.pts.forEach { pts.put(JSONArray().put(it[0].toDouble()).put(it[1].toDouble())) }
+            arr.put(JSONObject().put("t", s.t).put("d", s.d).put("p", pts))
+        }
+        prefs(ctx).edit().putString(KEY, arr.toString()).apply()
+    }
+}
+
 object TargetStore {
     private const val PREFS = "tapper"
     private const val KEY = "targets"
@@ -68,4 +101,17 @@ object Prefs {
     /** Random offset of each tap position, +/- this many pixels. */
     fun jitterPx(ctx: Context) = p(ctx).getInt("jitterPx", 0)
     fun setJitterPx(ctx: Context, v: Int) = p(ctx).edit().putInt("jitterPx", v.coerceIn(0, 200)).apply()
+
+    /** Replay: keep repeating the recording for this many seconds; 0 = until stopped. */
+    fun macroSeconds(ctx: Context) = p(ctx).getInt("macroSeconds", 0)
+    fun setMacroSeconds(ctx: Context, v: Int) = p(ctx).edit().putInt("macroSeconds", v.coerceAtLeast(0)).apply()
+
+    /** Replay: pause between one full run of the recording and the next. */
+    fun macroGapMs(ctx: Context) = p(ctx).getInt("macroGapMs", 500)
+    fun setMacroGapMs(ctx: Context, v: Int) = p(ctx).edit().putInt("macroGapMs", v.coerceAtLeast(0)).apply()
+
+    /** Floating bar collapsed? (UI-only, not part of profiles.) */
+    fun collapsed(ctx: Context) = ctx.getSharedPreferences("tapper_ui", Context.MODE_PRIVATE).getBoolean("collapsed", false)
+    fun setCollapsed(ctx: Context, v: Boolean) =
+        ctx.getSharedPreferences("tapper_ui", Context.MODE_PRIVATE).edit().putBoolean("collapsed", v).apply()
 }
