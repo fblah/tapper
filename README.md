@@ -9,7 +9,16 @@ Push to GitHub and download the `tapper-debug-apk` artifact from the *Build APK*
 
 ## Use
 1. Install, open Tapper, enable it in Settings > Accessibility.
-2. Floating bar: `+` add button, `▶/■` start/stop, `✕` hide, `⠿` drag the bar.
-3. While stopped: drag buttons into place; tap one to edit its interval (ms, min 20) or delete it.
-4. While running, buttons are click-through and each taps its own centre at its interval.
-Targets persist across restarts.
+2. Floating bar: `+` add tap button, `⇄` add swipe button (blue start + orange end marker), `▶/■` start/stop, `✕` hide, `⠿` drag the bar.
+3. While stopped: drag buttons into place; tap one to edit interval (ms, min 20), number of taps (0 = unlimited), swipe duration, or delete it.
+4. While running, buttons are click-through and tap their own centre.
+
+## Features
+- Per-button interval and repeat count; global stop timer (minutes).
+- Swipe buttons (start, end, duration).
+- Sequence mode: buttons fire one after another in number order (interval = wait after that button, repeat = taps in a row), with a cycle count.
+- Random jitter on interval (+/- %) and tap position (+/- px).
+- Named profiles, plus JSON export/import.
+- Quick Settings tile to start/stop (add it from the tile editor).
+
+Settings and profiles are on the main screen.

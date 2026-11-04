@@ -2,7 +2,9 @@ package com.tapper.app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.ComponentName
 import android.graphics.Color
+import android.service.quicksettings.TileService
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -68,6 +70,7 @@ class TapService : AccessibilityService() {
     private var playBtn: Button? = null
     private var editor: View? = null
     private var running = false
+    val isRunning get() = running
     private val timerStop = Runnable { stopRunning() }
     private var sequenceMode = false
     private var maxCycles = 0
@@ -349,13 +352,14 @@ class TapService : AccessibilityService() {
 
     // ---- running -----------------------------------------------------------------------------
 
-    private fun toggleRunning() = if (running) stopRunning() else startRunning()
+    fun toggleRunning() = if (running) stopRunning() else startRunning()
 
     private fun startRunning() {
         if (bubbles.isEmpty()) return
         closeEditor()
         running = true
         playBtn?.text = "■"
+        refreshTile()
         val now = SystemClock.uptimeMillis()
         val minutes = Prefs.timerMinutes(this)
         sequenceMode = Prefs.sequence(this)
@@ -378,6 +382,7 @@ class TapService : AccessibilityService() {
 
     private fun stopRunning() {
         running = false
+        refreshTile()
         handler.removeCallbacks(timerStop)
         playBtn?.text = "▶"
         bubbles.forEach { b ->
@@ -386,6 +391,10 @@ class TapService : AccessibilityService() {
             handler.removeCallbacks(seqTick)
             setTouchable(b, true)
         }
+    }
+
+    private fun refreshTile() = runCatching {
+        TileService.requestListeningState(this, ComponentName(this, TapTile::class.java))
     }
 
     private fun jitteredInterval(ms: Long): Long {

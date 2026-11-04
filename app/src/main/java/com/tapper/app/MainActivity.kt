@@ -94,10 +94,10 @@ class MainActivity : Activity() {
             text = """
                 How to use
                 1. Enable "Tapper" under Accessibility > Installed apps. Android requires this so the app can perform taps for you.
-                2. A floating control bar appears. Press + to add a tap button.
+                2. A floating control bar appears. Press + to add a tap button or ⇄ to add a swipe (drag its orange end marker).
                 3. While stopped, drag a button over what you want tapped. Tap a button to edit its interval (ms) or delete it.
                 4. Press ▶ on the bar. Each button now taps itself at its own interval. Press ■ to stop and edit again.
-                5. ✕ hides the controls; use "Show floating controls" here to bring them back.
+                5. ✕ hides the controls; use "Show floating controls" here to bring them back. You can also start/stop from the "Tapper" Quick Settings tile.
             """.trimIndent()
         }
         root.addView(status); root.addView(enable); root.addView(show); root.addView(timerRow); root.addView(sequence); root.addView(cyclesRow)
