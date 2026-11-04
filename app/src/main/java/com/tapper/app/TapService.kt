@@ -35,9 +35,12 @@ class TapService : AccessibilityService() {
     }
 
     private inner class Bubble(val target: Target) {
+        fun views() = listOfNotNull(view, endView)
         fun finished() = target.repeat > 0 && count >= target.repeat
         lateinit var view: TextView
         lateinit var params: WindowManager.LayoutParams
+        var endView: TextView? = null
+        var endParams: WindowManager.LayoutParams? = null
         var nextAt = 0L
         var count = 0
         val tick = object : Runnable {
@@ -46,7 +49,7 @@ class TapService : AccessibilityService() {
                 tap(this@Bubble)
                 count++
                 if (target.repeat > 0 && count >= target.repeat) {
-                    bubbles.forEach { it.view.alpha = if (it.finished()) 0.3f else 1f }
+                    bubbles.forEach { o -> o.views().forEach { it.alpha = if (o.finished()) 0.3f else 1f } }
                     if (bubbles.all { it.finished() }) stopRunning()
                     return
                 }
@@ -95,7 +98,7 @@ class TapService : AccessibilityService() {
     private fun hideOverlay() {
         stopRunning()
         closeEditor()
-        bubbles.forEach { runCatching { wm.removeView(it.view) } }
+        bubbles.forEach { b -> b.views().forEach { runCatching { wm.removeView(it) } } }
         bubbles.clear()
         panel?.let { runCatching { wm.removeView(it) } }
         panel = null
@@ -140,7 +143,8 @@ class TapService : AccessibilityService() {
         playBtn = play
         bar.addView(handle)
         bar.addView(play)
-        bar.addView(barButton("+") { addNewBubble() })
+        bar.addView(barButton("+") { addNewBubble(swipe = false) })
+        bar.addView(barButton("⇄") { addNewBubble(swipe = true) })
         bar.addView(barButton("✕") { hideOverlay() })
 
         panel = bar
@@ -149,25 +153,28 @@ class TapService : AccessibilityService() {
 
     // ---- bubbles -----------------------------------------------------------------------------
 
-    private fun addNewBubble() {
+    private fun addNewBubble(swipe: Boolean) {
         if (running) return
         val m = resources.displayMetrics
-        val t = Target(m.widthPixels / 2 - dp(28), m.heightPixels / 2 - dp(28))
+        val t = Target(m.widthPixels / 2 - dp(28), m.heightPixels / 2 - dp(28), swipe = swipe)
+        if (swipe) { t.x2 = t.x; t.y2 = t.y - dp(200) }
         addBubble(t)
         persist()
     }
 
+    private fun circle(color: Int) = TextView(this).apply {
+        setTextColor(Color.WHITE); textSize = 16f; gravity = Gravity.CENTER
+        width = dp(56); height = dp(56)
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(color)
+            setStroke(dp(2), Color.WHITE)
+        }
+    }
+
     private fun addBubble(t: Target) {
         val b = Bubble(t)
-        val tv = TextView(this).apply {
-            setTextColor(Color.WHITE); textSize = 16f; gravity = Gravity.CENTER
-            width = dp(56); height = dp(56)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.argb(150, 33, 150, 243))
-                setStroke(dp(2), Color.WHITE)
-            }
-        }
+        val tv = circle(Color.argb(150, 33, 150, 243))
         val params = overlayParams(touchable = true).apply { x = t.x; y = t.y }
         b.view = tv; b.params = params
         bubbles.add(b)
@@ -176,10 +183,31 @@ class TapService : AccessibilityService() {
             onClick = { openEditor(b) },
             onDrop = { t.x = params.x; t.y = params.y; persist() })
         wm.addView(tv, params)
+        if (t.swipe) {
+            val ev = circle(Color.argb(150, 255, 152, 0))
+            val ep = overlayParams(touchable = true).apply { x = t.x2; y = t.y2 }
+            b.endView = ev; b.endParams = ep
+            refreshLabels()
+            attachDrag(ev, ep, ev,
+                onClick = { openEditor(b) },
+                onDrop = { t.x2 = ep.x; t.y2 = ep.y; persist() })
+            wm.addView(ev, ep)
+        }
     }
 
     private fun refreshLabels() {
-        bubbles.forEachIndexed { i, b -> b.view.text = "${i + 1}" }
+        bubbles.forEachIndexed { i, b ->
+            b.view.text = if (b.target.swipe) "${i + 1}⇄" else "${i + 1}"
+            b.endView?.text = "→${i + 1}"
+        }
+    }
+
+    private fun setTouchable(b: Bubble, touchable: Boolean) {
+        listOfNotNull(b.view to b.params, b.endView?.let { it to b.endParams!! }).forEach { (v, p) ->
+            p.flags = if (touchable) p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            else p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { wm.updateViewLayout(v, p) }
+        }
     }
 
     private fun persist() = TargetStore.save(this, bubbles.map { it.target })
@@ -237,6 +265,17 @@ class TapService : AccessibilityService() {
             setText(b.target.repeat.toString()); setTextColor(Color.BLACK)
         }
         box.addView(repeatInput)
+        var swipeInput: EditText? = null
+        if (b.target.swipe) {
+            box.addView(TextView(this).apply {
+                text = "Swipe duration (ms, keep below the interval)"; setTextColor(Color.BLACK); textSize = 16f
+            })
+            swipeInput = EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                setText(b.target.swipeMs.toString()); setTextColor(Color.BLACK)
+            }
+            box.addView(swipeInput)
+        }
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(Button(this).apply {
             text = "Save"
@@ -245,6 +284,7 @@ class TapService : AccessibilityService() {
                 if (v != null) {
                     b.target.intervalMs = v.coerceAtLeast(MIN_INTERVAL_MS)
                 }
+                swipeInput?.text?.toString()?.toLongOrNull()?.let { b.target.swipeMs = it.coerceAtLeast(10L) }
                 b.target.repeat = repeatInput.text.toString().toIntOrNull()?.coerceAtLeast(0) ?: 0
                 persist()
                 closeEditor()
@@ -253,7 +293,7 @@ class TapService : AccessibilityService() {
         row.addView(Button(this).apply {
             text = "Delete"
             setOnClickListener {
-                runCatching { wm.removeView(b.view) }
+                b.views().forEach { runCatching { wm.removeView(it) } }
                 bubbles.remove(b); refreshLabels(); persist(); closeEditor()
             }
         })
@@ -288,9 +328,8 @@ class TapService : AccessibilityService() {
         if (minutes > 0) handler.postDelayed(timerStop, minutes * 60_000L)
         bubbles.forEach { b ->
             b.count = 0
-            b.view.alpha = 1f
-            b.params.flags = b.params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            wm.updateViewLayout(b.view, b.params)
+            b.views().forEach { it.alpha = 1f }
+            setTouchable(b, false)
             b.nextAt = now + b.target.intervalMs
             handler.postAtTime(b.tick, b.nextAt)
         }
@@ -301,10 +340,9 @@ class TapService : AccessibilityService() {
         handler.removeCallbacks(timerStop)
         playBtn?.text = "▶"
         bubbles.forEach { b ->
-            b.view.alpha = 1f
+            b.views().forEach { it.alpha = 1f }
             handler.removeCallbacks(b.tick)
-            b.params.flags = b.params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            runCatching { wm.updateViewLayout(b.view, b.params) }
+            setTouchable(b, true)
         }
     }
 
@@ -314,8 +352,15 @@ class TapService : AccessibilityService() {
         val path = Path().apply {
             moveTo(loc[0] + b.view.width / 2f, loc[1] + b.view.height / 2f)
         }
+        var duration = TAP_DURATION_MS
+        b.endView?.let { ev ->
+            val end = IntArray(2)
+            ev.getLocationOnScreen(end)
+            path.lineTo(end[0] + ev.width / 2f, end[1] + ev.height / 2f)
+            duration = b.target.swipeMs
+        }
         val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, TAP_DURATION_MS))
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
             .build()
         dispatchGesture(gesture, null, null)
     }
