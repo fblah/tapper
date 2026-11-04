@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Tapper</string>
+    <string name="service_description">Lets Tapper show floating tap targets and perform taps on them at the intervals you set. Tapper does not read screen content.</string>
+</resources>
