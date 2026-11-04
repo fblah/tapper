@@ -44,6 +44,9 @@ Locally with the Android SDK + Gradle 8.7: `gradle :app:assembleDebug`.
 - Sequence mode: buttons fire one after another in number order (interval = wait after that button, repeat = taps in a row), with a cycle count.
 - Random jitter on interval (+/- %) and tap position (+/- px).
 - Named profiles, plus JSON export/import.
+- Visual feedback: tap buttons pulse and draw a ring (or swipe trail) each time they fire.
+- Record mode: records your taps/swipes (the stop tap is not recorded) and replays them; long-press replay to set play time (0 = unlimited) and pause between repeats. Recording again replaces it.
+- Collapsible floating bar.
 - Quick Settings tile to start/stop (add it from the tile editor).
 
 Settings and profiles are on the main screen.

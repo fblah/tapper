@@ -130,7 +130,9 @@ class MainActivity : Activity() {
             "1  Turn on Tapper in Accessibility settings (tap the status pill). Android requires this for any app that taps for you.",
             "2  Tap “Show floating controls”. On the bar: ＋ adds a tap button, ⇄ adds a swipe (drag its teal end marker).",
             "3  Drag buttons onto what you want tapped. Tap a button to set its interval, repeat count, or delete it.",
-            "4  Press play on the bar. Press stop to edit again. You can also use the Tapper Quick Settings tile."
+            "4  Press play on the bar. Press stop to edit again. You can also use the Tapper Quick Settings tile.",
+            "5  Record: press the red dot, do your taps and swipes, press stop (that tap isn't recorded). Press the replay button to play them back; long-press it to set how long to play (0 = unlimited) and the pause between repeats. Recording again replaces the old one.",
+            "6  The arrow next to the grip collapses the bar to save space."
         ).forEach { help.addView(label(it, 13f, Ui.MUTED), lp(top = 10)) }
         root.addView(help, lp(top = 16))
 
