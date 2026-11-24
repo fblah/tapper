@@ -79,6 +79,14 @@ class MainActivity : Activity() {
             numberField(Prefs.jitterPct(this)) { Prefs.setJitterPct(this, it) }))
         run.addView(settingRow("Position offset", "Random ± pixels",
             numberField(Prefs.jitterPx(this)) { Prefs.setJitterPx(this, it) }))
+        val lockSwitch = Switch(this).apply {
+            isChecked = Prefs.hideOnLock(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                Prefs.setHideOnLock(this@MainActivity, on)
+                TapService.instance?.applyLockScreenVisibility()
+            }
+        }
+        run.addView(settingRow("Hide overlays when locked", "Keep the bar and buttons off the lock screen", lockSwitch))
         root.addView(run, lp(top = 20))
 
         // Profiles
@@ -132,7 +140,8 @@ class MainActivity : Activity() {
             "3  Drag buttons onto what you want tapped. Tap a button to set its interval, repeat count, or delete it.",
             "4  Press play on the bar. Press stop to edit again. You can also use the Tapper Quick Settings tile.",
             "5  Record: press the red dot, do your taps and swipes, press stop (that tap isn't recorded). Press the replay button to play them back; long-press it to set how long to play (0 = unlimited) and the pause between repeats. Recording again replaces the old one.",
-            "6  The arrow next to the grip collapses the bar to save space."
+            "6  The arrow next to the grip collapses the bar to save space.",
+            "7  Run settings has a switch to hide overlays while the phone is locked (off = show them on the lock screen)."
         ).forEach { help.addView(label(it, 13f, Ui.MUTED), lp(top = 10)) }
         root.addView(help, lp(top = 16))
 

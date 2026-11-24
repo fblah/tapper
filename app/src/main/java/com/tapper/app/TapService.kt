@@ -2,6 +2,7 @@ package com.tapper.app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.app.KeyguardManager
 import android.content.ComponentName
 import android.graphics.Color
 import android.graphics.Path
@@ -114,6 +115,15 @@ class TapService : AccessibilityService() {
     private val playToken = Any()
     private var gapMs = 0L
 
+    // lock screen: keep overlays off the lock screen when the option is on
+    private var hiddenByLock = false
+    private val lockTicker = object : Runnable {
+        override fun run() {
+            applyLockScreenVisibility()
+            handler.postDelayed(this, 500)
+        }
+    }
+
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
 
@@ -141,12 +151,15 @@ class TapService : AccessibilityService() {
         instance = this
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         showOverlay()
+        applyLockScreenVisibility()
+        handler.postDelayed(lockTicker, 500)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() { stopAll() }
 
     override fun onDestroy() {
+        handler.removeCallbacks(lockTicker)
         hideOverlay()
         instance = null
         super.onDestroy()
@@ -162,6 +175,28 @@ class TapService : AccessibilityService() {
         TargetStore.load(this).forEach { addBubble(it) }
         addFx()
         addPanel()
+        applyLockScreenVisibility()
+    }
+
+    /**
+     * Show/hide the floating overlays based on the lock screen state and the option. Hidden windows stay
+     * attached (so running taps and drag positions keep working) but don't draw on the lock screen.
+     */
+    fun applyLockScreenVisibility() {
+        val locked = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+        val shouldHide = locked && Prefs.hideOnLock(this)
+        if (shouldHide == hiddenByLock) return
+        hiddenByLock = shouldHide
+        setOverlaysVisible(!shouldHide)
+    }
+
+    private fun setOverlaysVisible(visible: Boolean) {
+        val v = if (visible) View.VISIBLE else View.GONE
+        panel?.visibility = v
+        bubbles.forEach { b -> b.views().forEach { it.visibility = v } }
+        fx?.visibility = v
+        editor?.visibility = v
+        capture?.visibility = v
     }
 
     /** Re-read the saved layout (after a profile is loaded or imported). */

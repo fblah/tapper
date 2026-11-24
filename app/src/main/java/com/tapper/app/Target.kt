@@ -114,4 +114,8 @@ object Prefs {
     fun collapsed(ctx: Context) = ctx.getSharedPreferences("tapper_ui", Context.MODE_PRIVATE).getBoolean("collapsed", false)
     fun setCollapsed(ctx: Context, v: Boolean) =
         ctx.getSharedPreferences("tapper_ui", Context.MODE_PRIVATE).edit().putBoolean("collapsed", v).apply()
+
+    /** Keep the floating overlay hidden while the phone is locked. */
+    fun hideOnLock(ctx: Context) = p(ctx).getBoolean("hideOnLock", true)
+    fun setHideOnLock(ctx: Context, v: Boolean) = p(ctx).edit().putBoolean("hideOnLock", v).apply()
 }
